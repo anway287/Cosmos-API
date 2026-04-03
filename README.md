@@ -41,3 +41,30 @@ API docs at **http://localhost:8000/docs**
 - **FastAPI** — async Python API
 - **Pydantic v2** — request/response validation
 - **Vanilla HTML/CSS/JS** — dark space-themed UI
+
+## 📸 UI Preview
+
+### ⭐ Stellar Life-Cycle Analyzer
+Analyze stars using temperature, luminosity, and mass to determine spectral class, HR diagram position, evolution stage, and lifespan.
+
+<p align="center">
+  <img src="assets/stellar.png" alt="Stellar Analyzer UI" width="800"/>
+</p>
+
+---
+
+### 🌌 Constellation Finder
+Identify constellations using Right Ascension and Declination, along with mythology, best viewing time, and nearby deep-sky objects.
+
+<p align="center">
+  <img src="assets/constellation.png" alt="Constellation Finder UI" width="800"/>
+</p>
+
+---
+
+### 🪐 Exoplanet Habitability Lab
+Evaluate whether a planet can support life using habitable zone calculations, Earth Similarity Index, and equilibrium temperature.
+
+<p align="center">
+  <img src="assets/exoplanet.png" alt="Exoplanet Habitability UI" width="800"/>
+</p>
