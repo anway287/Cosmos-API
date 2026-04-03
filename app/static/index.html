@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CosmosAI — Astronomy Analysis</title>
+<style>
+  :root {
+    --bg: #020510;
+    --surface: #0a0f1e;
+    --surface2: #0f1629;
+    --border: #1e2d4a;
+    --accent: #4f8ef7;
+    --purple: #a78bfa;
+    --gold: #f59e0b;
+    --green: #10b981;
+    --red: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── Canvas background ── */
+  #space-canvas {
+    position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  }
+
+  /* ── Layout ── */
+  .page { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 0 1.25rem 4rem; }
+
+  header { text-align: center; padding: 3rem 0 2rem; }
+  .logo {
+    font-size: 2.6rem; font-weight: 800; letter-spacing: -1px;
+    background: linear-gradient(135deg, #4f8ef7, #a78bfa, #f59e0b);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .tagline { color: var(--muted); margin-top: .4rem; }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; justify-content: center; gap: .5rem; flex-wrap: wrap; margin: 1.5rem 0; }
+  .tab {
+    padding: .5rem 1.3rem; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--surface);
+    color: var(--muted); cursor: pointer; font-size: .9rem; transition: all .2s;
+  }
+  .tab:hover { color: var(--text); border-color: var(--accent); }
+  .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* ── Panel ── */
+  .panel { display: none; }
+  .panel.active { display: block; animation: up .25s ease; }
+  @keyframes up { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 1rem; padding: 1.75rem;
+  }
+  .card-title { font-size: 1.25rem; font-weight: 700; margin-bottom: .25rem; }
+  .card-desc { color: var(--muted); font-size: .88rem; margin-bottom: 1.5rem; }
+
+  /* ── Form ── */
+  .presets { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: 1rem; }
+  .presets span { color: var(--muted); font-size: .8rem; align-self: center; }
+  .pbtn {
+    padding: .28rem .7rem; border-radius: .4rem; font-size: .78rem;
+    border: 1px solid var(--border); background: transparent;
+    color: var(--muted); cursor: pointer; transition: all .15s;
+  }
+  .pbtn:hover { border-color: var(--gold); color: var(--gold); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .85rem; margin-bottom: 1.1rem; }
+  .field label { display: block; font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: .3rem; }
+  .field input, .field select {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border);
+    border-radius: .5rem; color: var(--text); padding: .5rem .75rem;
+    font-size: .93rem; outline: none; transition: border-color .2s;
+  }
+  .field input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(79,142,247,.1); }
+  .cb-row { display: flex; align-items: center; gap: .5rem; margin-bottom: 1rem; color: var(--text); font-size: .93rem; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: .5rem;
+    padding: .6rem 1.6rem; border-radius: .55rem; border: none;
+    background: linear-gradient(135deg, var(--accent), var(--purple));
+    color: #fff; font-size: .95rem; font-weight: 600; cursor: pointer;
+    transition: opacity .2s; box-shadow: 0 0 18px rgba(79,142,247,.25);
+  }
+  .btn:hover { opacity: .88; }
+  .btn:disabled { opacity: .45; cursor: not-allowed; }
+  .spin { width:15px;height:15px;border:2px solid #fff4;border-top-color:#fff;border-radius:50%;animation:rot .65s linear infinite;display:none; }
+  .btn.loading .spin { display:block; }
+  @keyframes rot { to{transform:rotate(360deg)} }
+
+  /* ── Results ── */
+  .result { margin-top: 1.5rem; display: none; animation: up .25s ease; }
+  .result.show { display: block; }
+
+  .mgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: .65rem; margin-bottom: 1.25rem; }
+  .mcard {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: .6rem; padding: .8rem .9rem;
+  }
+  .mlabel { font-size: .7rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: .2rem; }
+  .mval { font-size: 1.05rem; font-weight: 700; color: var(--accent); }
+  .mval.green { color: var(--green); }
+  .mval.gold  { color: var(--gold); }
+  .mval.red   { color: var(--red); }
+  .mval.purple{ color: var(--purple); }
+
+  .section { font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .1em; color: var(--purple); margin: 1rem 0 .45rem; }
+
+  .narrative {
+    line-height: 1.8; color: var(--text); font-size: .95rem;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: .6rem; padding: 1rem 1.1rem;
+  }
+
+  .badge { display:inline-block; padding:.22rem .65rem; border-radius:999px; font-size:.78rem; font-weight:600; margin:.2rem;
+    background:rgba(79,142,247,.12); border:1px solid rgba(79,142,247,.25); color:var(--accent); }
+  .badge.gold  { background:rgba(245,158,11,.12); border-color:rgba(245,158,11,.25); color:var(--gold); }
+  .badge.green { background:rgba(16,185,129,.12); border-color:rgba(16,185,129,.25); color:var(--green); }
+  .badge.red   { background:rgba(239,68,68,.12);  border-color:rgba(239,68,68,.25);  color:var(--red); }
+
+  .bar-wrap { margin:.5rem 0; }
+  .bar-track { height:7px; background:var(--surface); border-radius:99px; overflow:hidden; }
+  .bar-fill { height:100%; border-radius:99px; background:linear-gradient(90deg,var(--accent),var(--green)); transition:width .9s cubic-bezier(.4,0,.2,1); }
+
+  .factors { padding-left:1.1rem; margin:.4rem 0; }
+  .factors li { margin-bottom:.3rem; font-size:.9rem; }
+
+  .err { color:var(--red); background:rgba(239,68,68,.08); border:1px solid rgba(239,68,68,.2); border-radius:.5rem; padding:.65rem .9rem; margin-top:.9rem; display:none; }
+  .err.show { display:block; }
+
+  footer { text-align:center; color:var(--muted); font-size:.82rem; padding:2rem 0; }
+  footer a { color:var(--purple); text-decoration:none; }
+</style>
+</head>
+<body>
+<canvas id="space-canvas"></canvas>
+<div class="page">
+
+  <header>
+    <div class="logo">✦ CosmosAI</div>
+    <p class="tagline">Stellar analysis · Constellation finder · Exoplanet habitability</p>
+  </header>
+
+  <div class="tabs">
+    <button class="tab active" onclick="tab('stellar',this)">⭐ Stellar Analysis</button>
+    <button class="tab" onclick="tab('constellation',this)">🌌 Constellation</button>
+    <button class="tab" onclick="tab('exoplanet',this)">🪐 Exoplanet</button>
+  </div>
+
+  <!-- ── STELLAR ───────────────────────────────────── -->
+  <div id="p-stellar" class="panel active">
+    <div class="card">
+      <div class="card-title">Stellar Life-Cycle Analyzer</div>
+      <p class="card-desc">Enter a star's temperature, luminosity, and mass. Get spectral classification, HR diagram position, evolution stage, and remaining lifespan — all from real physics.</p>
+
+      <div class="presets">
+        <span>Presets:</span>
+        <button class="pbtn" onclick="sp('sun')">☀️ Sun</button>
+        <button class="pbtn" onclick="sp('sirius')">💎 Sirius A</button>
+        <button class="pbtn" onclick="sp('betelgeuse')">🔴 Betelgeuse</button>
+        <button class="pbtn" onclick="sp('proxima')">🔵 Proxima Cen</button>
+        <button class="pbtn" onclick="sp('rigel')">🌟 Rigel</button>
+      </div>
+
+      <div class="grid">
+        <div class="field"><label>Star Name (optional)</label><input id="s-name" placeholder="e.g. Alpha Centauri A"/></div>
+        <div class="field"><label>Temperature (K)</label><input id="s-temp" type="number" value="5778" min="700"/></div>
+        <div class="field"><label>Luminosity (L☉)</label><input id="s-lum" type="number" value="1.0" step="0.001" min="0.0001"/></div>
+        <div class="field"><label>Mass (M☉)</label><input id="s-mass" type="number" value="1.0" step="0.01" min="0.01"/></div>
+      </div>
+      <button class="btn" id="s-btn" onclick="doStellar()"><div class="spin"></div><span>Analyze Star</span></button>
+      <div class="err" id="s-err"></div>
+
+      <div class="result" id="s-res">
+        <div class="mgrid" id="s-metrics"></div>
+        <div class="section">Evolutionary Narrative</div>
+        <div class="narrative" id="s-narr"></div>
+        <div class="section" style="margin-top:1rem">Did You Know?</div>
+        <div class="narrative" id="s-fact" style="background:rgba(167,139,250,.06);border-color:rgba(167,139,250,.2)"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── CONSTELLATION ─────────────────────────────── -->
+  <div id="p-constellation" class="panel">
+    <div class="card">
+      <div class="card-title">Constellation Finder</div>
+      <p class="card-desc">Enter equatorial coordinates (Right Ascension &amp; Declination) to identify the IAU constellation, its mythology, best viewing month, and notable deep-sky objects.</p>
+
+      <div class="presets">
+        <span>Presets:</span>
+        <button class="pbtn" onclick="cp('orion')">🌟 Orion Nebula</button>
+        <button class="pbtn" onclick="cp('andromeda')">🌀 Andromeda Galaxy</button>
+        <button class="pbtn" onclick="cp('sgr')">🎯 Galactic Centre</button>
+        <button class="pbtn" onclick="cp('pleiades')">✨ Pleiades</button>
+        <button class="pbtn" onclick="cp('virgo')">🍇 Virgo Cluster</button>
+      </div>
+
+      <div class="grid">
+        <div class="field"><label>Right Ascension (0–360°)</label><input id="c-ra" type="number" value="83.8" step="0.1" min="0" max="360"/></div>
+        <div class="field"><label>Declination (−90 to +90°)</label><input id="c-dec" type="number" value="-5.4" step="0.1" min="-90" max="90"/></div>
+      </div>
+      <button class="btn" id="c-btn" onclick="doConst()"><div class="spin"></div><span>Find Constellation</span></button>
+      <div class="err" id="c-err"></div>
+
+      <div class="result" id="c-res">
+        <div class="mgrid" id="c-metrics"></div>
+        <div class="section">Deep-Sky Objects</div>
+        <div id="c-objs"></div>
+        <div class="section" style="margin-top:1rem">Mythology &amp; Viewing Guide</div>
+        <div class="narrative" id="c-narr"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── EXOPLANET ──────────────────────────────────── -->
+  <div id="p-exoplanet" class="panel">
+    <div class="card">
+      <div class="card-title">Exoplanet Habitability Lab</div>
+      <p class="card-desc">Calculate the habitable zone, Earth Similarity Index, and equilibrium temperature for any exoplanet using real astrophysics (Kopparapu 2013).</p>
+
+      <div class="presets">
+        <span>Presets:</span>
+        <button class="pbtn" onclick="ep('earth')">🌍 Earth</button>
+        <button class="pbtn" onclick="ep('proxb')">🔵 Proxima b</button>
+        <button class="pbtn" onclick="ep('k442b')">🟢 Kepler-442b</button>
+        <button class="pbtn" onclick="ep('mars')">🔴 Mars</button>
+        <button class="pbtn" onclick="ep('venus')">🟡 Venus</button>
+      </div>
+
+      <div class="grid">
+        <div class="field"><label>Planet Name</label><input id="e-name" value="Kepler-442b"/></div>
+        <div class="field"><label>Orbital Distance (AU)</label><input id="e-dist" type="number" value="0.409" step="0.001" min="0.001"/></div>
+        <div class="field"><label>Planet Radius (R⊕)</label><input id="e-rad" type="number" value="1.34" step="0.01" min="0.1"/></div>
+        <div class="field"><label>Planet Mass (M⊕)</label><input id="e-mass" type="number" value="2.3" step="0.1" min="0.01"/></div>
+        <div class="field"><label>Host Star Luminosity (L☉)</label><input id="e-slum" type="number" value="0.112" step="0.001" min="0.0001"/></div>
+        <div class="field"><label>Host Star Temperature (K)</label><input id="e-stemp" type="number" value="4402" min="1000"/></div>
+      </div>
+      <div class="cb-row"><input type="checkbox" id="e-atm" checked/><label for="e-atm">Atmosphere detected / assumed</label></div>
+      <button class="btn" id="e-btn" onclick="doExo()"><div class="spin"></div><span>Run Analysis</span></button>
+      <div class="err" id="e-err"></div>
+
+      <div class="result" id="e-res">
+        <div class="mgrid" id="e-metrics"></div>
+        <div class="section">Key Factors</div>
+        <ul class="factors" id="e-factors"></ul>
+        <div class="section" style="margin-top:.5rem">Assessment</div>
+        <div class="narrative" id="e-narr"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <p>CosmosAI · Python + FastAPI · <a href="/docs">API Docs</a></p>
+  </footer>
+</div>
+
+<script>
+// ── Tab switching ──────────────────────────────
+function tab(name, el) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('p-' + name).classList.add('active');
+  el.classList.add('active');
+}
+
+// ── Helpers ───────────────────────────────────
+function load(id, on) {
+  const b = document.getElementById(id);
+  b.disabled = on;
+  b.classList.toggle('loading', on);
+}
+function err(id, msg) {
+  const e = document.getElementById(id);
+  e.textContent = msg; e.classList.toggle('show', !!msg);
+}
+async function post(url, body) {
+  const r = await fetch(url, {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)
+  });
+  if (!r.ok) { const d = await r.json().catch(()=>({})); throw new Error(d.detail || `Error ${r.status}`); }
+  return r.json();
+}
+
+// ── Stellar ───────────────────────────────────
+const SP = {
+  sun:        {name:'Sun',         temp:5778,  lum:1.0,      mass:1.0  },
+  sirius:     {name:'Sirius A',    temp:9940,  lum:25.4,     mass:2.06 },
+  betelgeuse: {name:'Betelgeuse',  temp:3500,  lum:126000,   mass:11.6 },
+  proxima:    {name:'Proxima Cen', temp:3042,  lum:0.00155,  mass:0.122},
+  rigel:      {name:'Rigel',       temp:12100, lum:120000,   mass:21.0 },
+};
+function sp(k) {
+  const p = SP[k];
+  document.getElementById('s-name').value  = p.name;
+  document.getElementById('s-temp').value  = p.temp;
+  document.getElementById('s-lum').value   = p.lum;
+  document.getElementById('s-mass').value  = p.mass;
+}
+
+async function doStellar() {
+  err('s-err','');
+  load('s-btn', true);
+  try {
+    const d = await post('/api/stellar/analyze', {
+      name:             document.getElementById('s-name').value || undefined,
+      temperature_k:    +document.getElementById('s-temp').value,
+      luminosity_solar: +document.getElementById('s-lum').value,
+      mass_solar:       +document.getElementById('s-mass').value,
+    });
+    const m = d.metrics;
+    const lc = m.main_sequence_lifetime_gyr > 5 ? 'green' : m.main_sequence_lifetime_gyr > 1 ? 'gold' : 'red';
+    document.getElementById('s-metrics').innerHTML = `
+      <div class="mcard"><div class="mlabel">Spectral Class</div><div class="mval purple">${m.spectral_class}</div></div>
+      <div class="mcard"><div class="mlabel">Color</div><div class="mval">${m.color}</div></div>
+      <div class="mcard"><div class="mlabel">Radius (R☉)</div><div class="mval">${m.radius_solar}</div></div>
+      <div class="mcard"><div class="mlabel">Surface Gravity (m/s²)</div><div class="mval">${m.surface_gravity.toLocaleString()}</div></div>
+      <div class="mcard"><div class="mlabel">Abs. Magnitude</div><div class="mval gold">${m.absolute_magnitude}</div></div>
+      <div class="mcard"><div class="mlabel">MS Lifetime (Gyr)</div><div class="mval ${lc}">${m.main_sequence_lifetime_gyr.toLocaleString()}</div></div>
+      <div class="mcard"><div class="mlabel">Current Stage</div><div class="mval green">${m.current_stage}</div></div>
+      <div class="mcard"><div class="mlabel">HR Region</div><div class="mval">${d.hr_position.vertical}</div></div>
+      ${m.time_remaining_gyr!=null?`<div class="mcard"><div class="mlabel">Time Remaining (Gyr)</div><div class="mval">${m.time_remaining_gyr.toLocaleString()}</div></div>`:''}
+    `;
+    document.getElementById('s-narr').textContent = d.narrative;
+    document.getElementById('s-fact').textContent = d.fun_fact;
+    document.getElementById('s-res').classList.add('show');
+  } catch(e) { err('s-err', e.message); }
+  finally { load('s-btn', false); }
+}
+
+// ── Constellation ─────────────────────────────
+const CP = {
+  orion:     {ra:83.8,  dec:-5.4 },
+  andromeda: {ra:10.7,  dec:41.3 },
+  sgr:       {ra:266.4, dec:-29.0},
+  pleiades:  {ra:56.9,  dec:24.1 },
+  virgo:     {ra:187.7, dec:12.4 },
+};
+function cp(k) {
+  const p = CP[k];
+  document.getElementById('c-ra').value  = p.ra;
+  document.getElementById('c-dec').value = p.dec;
+}
+
+async function doConst() {
+  err('c-err','');
+  load('c-btn', true);
+  try {
+    const d = await post('/api/constellation/identify', {
+      ra_degrees:  +document.getElementById('c-ra').value,
+      dec_degrees: +document.getElementById('c-dec').value,
+    });
+    document.getElementById('c-metrics').innerHTML = `
+      <div class="mcard"><div class="mlabel">Constellation</div><div class="mval purple">${d.name} (${d.abbreviation})</div></div>
+      <div class="mcard"><div class="mlabel">Genitive</div><div class="mval">${d.genitive}</div></div>
+      <div class="mcard"><div class="mlabel">Area</div><div class="mval gold">${d.area_sq_deg.toLocaleString()} sq°</div></div>
+      <div class="mcard"><div class="mlabel">Brightest Star</div><div class="mval green">${d.brightest_star}</div></div>
+      <div class="mcard"><div class="mlabel">Best Month</div><div class="mval">${d.best_month}</div></div>
+      <div class="mcard"><div class="mlabel">Hemisphere</div><div class="mval">${d.hemisphere}</div></div>
+    `;
+    document.getElementById('c-objs').innerHTML = d.notable_objects.length
+      ? d.notable_objects.map(o=>`<span class="badge gold">${o}</span>`).join('')
+      : '<span class="badge">No major catalogued objects in this region</span>';
+    document.getElementById('c-narr').textContent = d.mythology;
+    document.getElementById('c-res').classList.add('show');
+  } catch(e) { err('c-err', e.message); }
+  finally { load('c-btn', false); }
+}
+
+// ── Exoplanet ─────────────────────────────────
+const EP = {
+  earth: {name:'Earth',      dist:1.0,    rad:1.0,   mass:1.0,   slum:1.0,    stemp:5778, atm:true },
+  proxb: {name:'Proxima b',  dist:0.0485, rad:1.07,  mass:1.27,  slum:0.0017, stemp:3042, atm:true },
+  k442b: {name:'Kepler-442b',dist:0.409,  rad:1.34,  mass:2.3,   slum:0.112,  stemp:4402, atm:true },
+  mars:  {name:'Mars',       dist:1.524,  rad:0.532, mass:0.107, slum:1.0,    stemp:5778, atm:true },
+  venus: {name:'Venus',      dist:0.723,  rad:0.949, mass:0.815, slum:1.0,    stemp:5778, atm:true },
+};
+function ep(k) {
+  const p = EP[k];
+  document.getElementById('e-name').value  = p.name;
+  document.getElementById('e-dist').value  = p.dist;
+  document.getElementById('e-rad').value   = p.rad;
+  document.getElementById('e-mass').value  = p.mass;
+  document.getElementById('e-slum').value  = p.slum;
+  document.getElementById('e-stemp').value = p.stemp;
+  document.getElementById('e-atm').checked = p.atm;
+}
+
+async function doExo() {
+  err('e-err','');
+  load('e-btn', true);
+  try {
+    const d = await post('/api/exoplanet/habitability', {
+      planet_name:             document.getElementById('e-name').value,
+      orbital_distance_au:     +document.getElementById('e-dist').value,
+      planet_radius_earth:     +document.getElementById('e-rad').value,
+      planet_mass_earth:       +document.getElementById('e-mass').value,
+      stellar_luminosity_solar:+document.getElementById('e-slum').value,
+      stellar_temperature_k:   +document.getElementById('e-stemp').value,
+      has_atmosphere:          document.getElementById('e-atm').checked,
+    });
+    const sc = d.habitability_score >= 75 ? 'green' : d.habitability_score >= 50 ? 'gold' : 'red';
+    const bc = d.habitability_score >= 75 ? 'green' : d.habitability_score >= 50 ? 'gold' : 'red';
+    document.getElementById('e-metrics').innerHTML = `
+      <div class="mcard">
+        <div class="mlabel">Habitability Score</div>
+        <div class="mval ${sc}" style="font-size:1.5rem">${d.habitability_score}<span style="font-size:.75rem;font-weight:400">/100</span></div>
+        <div class="bar-wrap"><div class="bar-track"><div class="bar-fill" style="width:${d.habitability_score}%"></div></div></div>
+      </div>
+      <div class="mcard"><div class="mlabel">Classification</div><div class="mval"><span class="badge ${bc}">${d.habitability_class}</span></div></div>
+      <div class="mcard"><div class="mlabel">Eq. Temperature (K)</div><div class="mval">${d.equilibrium_temperature_k.toLocaleString()}</div></div>
+      <div class="mcard"><div class="mlabel">Earth Similarity Index</div><div class="mval ${sc}">${d.earth_similarity_index}</div></div>
+      <div class="mcard"><div class="mlabel">Habitable Zone (AU)</div><div class="mval">${d.habitable_zone.inner_au} – ${d.habitable_zone.outer_au}</div></div>
+      <div class="mcard"><div class="mlabel">In Habitable Zone?</div><div class="mval ${d.habitable_zone.in_zone?'green':'red'}">${d.habitable_zone.in_zone?'✓ Yes':'✗ No'}</div></div>
+    `;
+    document.getElementById('e-factors').innerHTML = d.key_factors.map(f=>`<li>${f}</li>`).join('');
+    document.getElementById('e-narr').textContent = d.summary;
+    document.getElementById('e-res').classList.add('show');
+  } catch(e) { err('e-err', e.message); }
+  finally { load('e-btn', false); }
+}
+</script>
+
+<script>
+// ── 3D Space Travel Animation ──────────────────────────
+const canvas = document.getElementById('space-canvas');
+const ctx = canvas.getContext('2d');
+
+let W, H, cx, cy;
+function resize() {
+  W = canvas.width  = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+  cx = W / 2; cy = H / 2;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ── Stars (warp field) ────────────────────────────────
+const STAR_COUNT = 420;
+const STAR_COLORS = ['#ffffff','#cce0ff','#d4bbff','#ffe8a0','#aaddff','#ffffff','#ffffff'];
+
+class Star {
+  constructor() { this.reset(true); }
+  reset(initial) {
+    this.x  = (Math.random() - 0.5) * W * 2.5;
+    this.y  = (Math.random() - 0.5) * H * 2.5;
+    this.z  = initial ? Math.random() * W : W;
+    this.pz = this.z;
+    this.color = STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)];
+    this.size  = Math.random() * 1.5 + 0.3;
+  }
+  update(speed) {
+    this.pz = this.z;
+    this.z -= speed;
+    if (this.z <= 0) this.reset(false);
+  }
+  draw() {
+    const sx  = (this.x / this.z)  * W + cx;
+    const sy  = (this.y / this.z)  * H + cy;
+    const spx = (this.x / this.pz) * W + cx;
+    const spy = (this.y / this.pz) * H + cy;
+    if (sx < -50 || sx > W+50 || sy < -50 || sy > H+50) return;
+
+    const progress = 1 - this.z / W;
+    const r = this.size * (progress * 2.5 + 0.3);
+    const alpha = Math.min(1, progress * 1.8);
+
+    // streak line
+    ctx.beginPath();
+    ctx.moveTo(spx, spy);
+    ctx.lineTo(sx, sy);
+    ctx.strokeStyle = this.color.replace(')', `,${alpha * 0.5})`).replace('rgb','rgba').replace('#', 'rgba(').replace('rgba(', 'rgba(') || this.color;
+    ctx.globalAlpha = alpha * 0.6;
+    ctx.lineWidth = r * 0.5;
+    ctx.stroke();
+
+    // star dot
+    ctx.globalAlpha = alpha;
+    ctx.beginPath();
+    ctx.arc(sx, sy, Math.max(0.3, r), 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+
+    // bright core glow for close stars
+    if (progress > 0.6) {
+      ctx.globalAlpha = alpha * 0.25;
+      ctx.beginPath();
+      ctx.arc(sx, sy, r * 3, 0, Math.PI * 2);
+      const grd = ctx.createRadialGradient(sx, sy, 0, sx, sy, r * 3);
+      grd.addColorStop(0, this.color);
+      grd.addColorStop(1, 'transparent');
+      ctx.fillStyle = grd;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ── Comets ────────────────────────────────────────────
+class Comet {
+  constructor() { this.spawn(); }
+  spawn() {
+    const edge = Math.floor(Math.random() * 4);
+    if (edge === 0) { this.x = Math.random()*W; this.y = -20; }
+    else if (edge===1){ this.x = W+20; this.y = Math.random()*H; }
+    else if (edge===2){ this.x = Math.random()*W; this.y = H+20; }
+    else             { this.x = -20; this.y = Math.random()*H; }
+
+    const angle = Math.atan2(cy - this.y, cx - this.x) + (Math.random()-0.5)*0.6;
+    const speed = Math.random() * 6 + 5;
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed;
+    this.len = Math.random() * 180 + 80;
+    this.width = Math.random() * 1.5 + 0.5;
+    this.alpha = Math.random() * 0.6 + 0.4;
+    this.alive = true;
+    this.color = Math.random() < 0.5 ? '#a0d4ff' : '#e0ccff';
+  }
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    if (this.x < -200 || this.x > W+200 || this.y < -200 || this.y > H+200) {
+      this.alive = false;
+    }
+  }
+  draw() {
+    const tx = this.x - this.vx * (this.len / Math.hypot(this.vx, this.vy));
+    const ty = this.y - this.vy * (this.len / Math.hypot(this.vx, this.vy));
+
+    const grd = ctx.createLinearGradient(tx, ty, this.x, this.y);
+    grd.addColorStop(0, 'transparent');
+    grd.addColorStop(0.7, this.color.replace(')', `,${this.alpha*0.3})`).replace('#a0d4ff','rgba(160,212,255').replace('#e0ccff','rgba(224,204,255'));
+    grd.addColorStop(1, this.color.replace(')', `,${this.alpha})`).replace('#a0d4ff','rgba(160,212,255').replace('#e0ccff','rgba(224,204,255'));
+
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.lineTo(this.x, this.y);
+    ctx.strokeStyle = grd;
+    ctx.lineWidth = this.width;
+    ctx.lineCap = 'round';
+    ctx.globalAlpha = 1;
+    ctx.stroke();
+
+    // head glow
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.width * 2, 0, Math.PI*2);
+    ctx.fillStyle = '#ffffff';
+    ctx.globalAlpha = this.alpha;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ── Nebula dust ───────────────────────────────────────
+function drawNebula() {
+  const clouds = [
+    { x: W*0.15, y: H*0.25, r: W*0.22, c: 'rgba(79,50,160,' },
+    { x: W*0.82, y: H*0.65, r: W*0.18, c: 'rgba(20,80,160,' },
+    { x: W*0.55, y: H*0.80, r: W*0.15, c: 'rgba(100,30,120,' },
+  ];
+  clouds.forEach(({ x, y, r, c }) => {
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    g.addColorStop(0,   c + '0.045)');
+    g.addColorStop(0.5, c + '0.02)');
+    g.addColorStop(1,   c + '0)');
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = g;
+    ctx.fill();
+  });
+}
+
+// ── Init ──────────────────────────────────────────────
+const stars  = Array.from({ length: STAR_COUNT }, () => new Star());
+const comets = [];
+let cometTimer = 0;
+let speed = 3.5;
+
+function animate() {
+  requestAnimationFrame(animate);
+
+  ctx.fillStyle = '#020510';
+  ctx.fillRect(0, 0, W, H);
+
+  drawNebula();
+
+  // Warp speed slightly pulses
+  speed = 3.2 + Math.sin(Date.now() / 4000) * 0.6;
+
+  stars.forEach(s => { s.update(speed); s.draw(); });
+
+  // Spawn comets randomly
+  cometTimer++;
+  if (cometTimer > 140 + Math.random() * 200) {
+    comets.push(new Comet());
+    cometTimer = 0;
+  }
+  for (let i = comets.length - 1; i >= 0; i--) {
+    comets[i].update();
+    comets[i].draw();
+    if (!comets[i].alive) comets.splice(i, 1);
+  }
+}
+
+animate();
+</script>
+</body>
+</html>
